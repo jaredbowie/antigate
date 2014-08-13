@@ -2,18 +2,14 @@
   (:require [clj-http.client :as client])
   )
 
-(defn submit-captcha [user-key image-full-path]
+(defn- submit-captcha [user-key image-full-path]
    (client/post "http://antigate.com/in.php"
-               {:query-params {:key user-key
-                                        ;:method "post"
-                               }
-                :multipart [;{:name "max_bid" :content max-bid}
-                            {:name "key" :content user-key}
+               {:multipart [{:name "key" :content user-key}
                             {:name "method" :content "post"}
                             {:name "file" :content (clojure.java.io/file image-full-path)}]})
   )
 
-(defn get-captcha-id
+(defn- get-captcha-id
   "assumes post body returns OK|CAPTCHA_ID_HERE"
   [post-result-body]
   (let [captcha-id (subs post-result-body 3)]
@@ -21,8 +17,7 @@
     )
   )
 
-(defn check-post-result [post-result-body]
-  (println post-result-body)
+(defn- check-post-result [post-result-body]
   (cond
    (= "OK|" (subs post-result-body 0 3)) true
    (= "ERROR_WRONG_USER_KEY" post-result-body) "user authorization key is invalid (its length is not 32 bytes as it should be)"
@@ -38,14 +33,14 @@
    )
   )
 
-(defn retrieve-captcha-status [user-key captcha-id]
+(defn- retrieve-captcha-status [user-key captcha-id]
   (client/get "http://antigate.com/res.php" {:query-params {:key user-key
                                                             :action "get"
                                                             :id captcha-id
                                                             }})
   )
 
-(defn wait-for-result [user-key captcha-id]
+(defn- wait-for-result [user-key captcha-id]
   (loop [times 0
          again true
          error true
@@ -89,35 +84,42 @@
     )
   )
 
-(defn get-min-bid []
-  (let [body-http-resp (:body (client/get "http://antigate.com/load.php"))]
-    (second (re-find #"<minbid>([\w\.]+)</minbid>" body-http-resp))
+(defn get-load-info
+"returns a map of the load xml as floats"
+  []
+  (let [body-http-resp (:body (client/get "http://antigate.com/load.php"))
+        [waiting waitingru load minbid minbidru average-recognition-time average-recognition-timeru] (map #(read-string %) (drop 1 (re-find #"<RESPONSE>\n<waiting>(\d+)</waiting>\n<waitingRU>(\d+)</waitingRU>\n<load>([\d\.]+)</load>\n<minbid>([\d\.]+)</minbid>\n<minbidRU>([\d\.]+)</minbidRU>\n<averageRecognitionTime>([\d\.]+)</averageRecognitionTime>\n<averageRecognitionTimeRU>([\d\.]+)</averageRecognitionTimeRU>\n</RESPONSE>" body-http-resp)))]
+    {:waiting waiting :waitingru waitingru :load load :minbid minbid :minbidru minbidru :average-recognition-time average-recognition-time :average-recgonition-timeru average-recognition-timeru}
     )
   )
 
-(defn -main [user-key image-full-path]
-  (let [;min-bid (get-min-bid)
-        post-result (submit-captcha user-key image-full-path)
+(defn report-bad-captcha-result [key captcha-id]
+  (client/get "http://antigate.com/res.php" {:query-params {:key key
+                                                            :action "reportbad"
+                                                            :id captcha-id
+                                                            }})
+  )
+
+(defn retrieve-current-account-balance [key]
+  (client/get "http://antigate.com/res.php" {:query-params {:key key
+                                                            :action "getbalance"
+                                                            }})
+  )
+
+(defn solve-captcha
+  "returns a map of the result: see below"
+  [user-key image-full-path]
+  (let [post-result (submit-captcha user-key image-full-path)
         post-result-body (:body post-result)
         post-result-message (check-post-result post-result-body)
         ]
-;    (println min-bid)
     (if (true? post-result-message)
       (let [id (get-captcha-id post-result-body)
             [the-result error] (wait-for-result user-key id)
             ]
-        (if (true? error)
-          (println (str "Error: " the-result))
-          the-result
-          )
+        {:error error :result the-result}
         )
-      (do
-        (println "false post-result-message")
-        post-result-message)
+      {:error true :result post-result-message}
       )
     )
-  )
-
-(defn test-main []
-  (-main "" "/home/jared/clojureprojects/puploader/phantom2.png")
   )

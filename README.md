@@ -1,10 +1,19 @@
 # antigate
 
-A Clojure library designed to ... well, that part is up to you.
+A Clojure library for interacting with the antigate api
 
 ## Usage
 
-FIXME
+#+BEGIN_SRC clojure
+[antigate "0.1.0"]
+#+END_SRC
+
+#+BEGIN_SRC clojure
+(ns my-app.core
+(:require [antigate.core :as antigate]))
+#+END_SRC
+
+
 
 ## License
 

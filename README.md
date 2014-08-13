@@ -4,14 +4,16 @@ A Clojure library for interacting with the antigate api
 
 ## Usage
 
-#+BEGIN_SRC clojure
-[antigate "0.1.0"]
-#+END_SRC
 
-#+BEGIN_SRC clojure
+```el
+[antigate "0.1.0"]
+```
+
+
+```el
 (ns my-app.core
 (:require [antigate.core :as antigate]))
-#+END_SRC
+```
 
 
 
